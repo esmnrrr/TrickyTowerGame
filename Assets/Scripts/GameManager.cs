@@ -1,60 +1,83 @@
 using UnityEngine;
+using System.Collections; // Coroutine (bekleme süresi) kullanabilmek için bunu ekledik
 
-// --- STATE PATTERN (DURUM KALIBI) ---
-// Oyunun anlýk olarak hangi aþamada olduðunu belirlediðimiz liste
 public enum GameState
 {
-    WaitingForP1,   // Oyuncu 1 blok seçmesini/sürüklemesini bekliyor
-    WaitingForP2,   // Oyuncu 2 blok seçmesini/sürüklemesini bekliyor
-    Dragging,       // Þu an bir blok havada sürükleniyor
-    CheckingBalance,// Blok býrakýldý, kule yýkýlacak mý diye izliyoruz
-    GameOver        // Kule yýkýldý, oyun bitti
+    WaitingForP1,
+    WaitingForP2,
+    Dragging,
+    CheckingBalance,
+    GameOver
 }
 
 public class GameManager : MonoBehaviour
 {
-    // --- SINGLETON PATTERN ---
     public static GameManager Instance { get; private set; }
-
-    [Header("Oyun Durumu")]
     public GameState currentState;
+
+    [Header("Blok ve Spawn Ayarlarý")]
+    public GameObject[] blockPrefabs; // Oluþturduðun Tetris prefab'larýný buraya atacaksýn
+    public Transform spawnPoint;      // Bloklarýn tepede belireceði nokta
+
+    private int currentPlayer = 1;    // Sýranýn kimde olduðunu tutar (1 veya 2)
 
     private void Awake()
     {
-        // Singleton Kurulumu
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
     private void Start()
     {
-        // Oyuna P1'in sýrasýyla baþlýyoruz
+        // Oyunu P1'in sýrasýyla baþlatýyoruz
         ChangeState(GameState.WaitingForP1);
     }
 
-    // Durumlarý deðiþtireceðimiz ve her durumda ne olacaðýný yöneten ana fonksiyon
     public void ChangeState(GameState newState)
     {
         currentState = newState;
-        Debug.Log("Oyun Durumu Deðiþti: " + currentState);
+        Debug.Log("Oyun Durumu: " + currentState);
 
         switch (currentState)
         {
             case GameState.WaitingForP1:
-                // P1 için yeni blok spawn etme veya seçmesine izin verme kodlarý buraya gelecek
+                currentPlayer = 1;
+                SpawnBlock();
                 break;
             case GameState.WaitingForP2:
-                // P2 için blok spawn etme kodlarý buraya gelecek
-                break;
-            case GameState.Dragging:
-                // Blok sürüklenirken arka planda yapýlacak þeyler (varsa)
+                currentPlayer = 2;
+                SpawnBlock();
                 break;
             case GameState.CheckingBalance:
-                // Blok býrakýldýðýnda 2-3 saniye kulenin yýkýlýp yýkýlmadýðýný kontrol edeceðiz
+                // Blok býrakýldý, sallantýnýn durmasý için 2 saniye beklemeye baþlýyoruz
+                StartCoroutine(CheckBalanceRoutine());
                 break;
             case GameState.GameOver:
-                // Kule yýkýldýysa kaybedeni göster
+                Debug.Log("OYUN BÝTTÝ! Kaybeden: Oyuncu " + currentPlayer);
                 break;
+        }
+    }
+
+    // Rastgele bir blok seçip havada belirlemesini saðlayan fonksiyon
+    void SpawnBlock()
+    {
+        if (blockPrefabs.Length > 0 && spawnPoint != null)
+        {
+            int randomIndex = Random.Range(0, blockPrefabs.Length);
+            Instantiate(blockPrefabs[randomIndex], spawnPoint.position, Quaternion.identity);
+        }
+    }
+
+    // 2 saniyelik zamanlayýcý (Oyunun hata vermeden beklemesini saðlayan sihirli yapý)
+    IEnumerator CheckBalanceRoutine()
+    {
+        yield return new WaitForSeconds(2.5f); // 2.5 saniye kulenin sallantýsýný izle
+
+        // Eðer bu 2.5 saniye içinde blok yere düþüp "GameOver" olmadýysa, sýrayý deðiþtir!
+        if (currentState != GameState.GameOver)
+        {
+            if (currentPlayer == 1) ChangeState(GameState.WaitingForP2);
+            else ChangeState(GameState.WaitingForP1);
         }
     }
 }
