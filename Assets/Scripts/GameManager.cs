@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections; // Coroutine (bekleme süresi) kullanabilmek için bunu ekledik
+using System; // ACTION kullanabilmek için ekledik
+using UnityEngine.SceneManagement; // Sahne geçiþleri ve yeniden baþlatma için zorunlu!
 
 public enum GameState
 {
@@ -19,12 +21,29 @@ public class GameManager : MonoBehaviour
     public GameObject[] blockPrefabs; // Oluþturduðun Tetris prefab'larýný buraya atacaksýn
     public Transform spawnPoint;      // Bloklarýn tepede belireceði nokta
 
-    private int currentPlayer = 1;    // Sýranýn kimde olduðunu tutar (1 veya 2)
+    public int currentPlayer = 1;    // Sýranýn kimde olduðunu tutar (1 veya 2)
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        OnScreenShake = null;
+        OnGameStateChanged = null;
+    }
+
+    // OBSERVER PATTERN: Oyun durumunun deðiþtiðini diðer sistemlere bildirmek için evrensel sinyal
+    public static event Action<GameState> OnGameStateChanged;
+
+    // OBSERVER PATTERN: Diðer sistemlerin dinleyebileceði evrensel sinyal
+    public static event Action OnScreenShake;
+
+    // Herhangi bir obje bu fonksiyonu çaðýrarak sinyali ateþleyebilir
+    public static void TriggerShake()
+    {
+        OnScreenShake?.Invoke(); // Eðer bu sinyali dinleyen biri varsa, çalýþtýr!
     }
 
     private void Start()
@@ -37,6 +56,9 @@ public class GameManager : MonoBehaviour
     {
         currentState = newState;
         Debug.Log("Oyun Durumu: " + currentState);
+
+        // Oyun durumunun deðiþtiðini diðer sistemlere bildirmek için sinyali ateþle
+        OnGameStateChanged?.Invoke(currentState);
 
         switch (currentState)
         {
@@ -53,7 +75,7 @@ public class GameManager : MonoBehaviour
                 StartCoroutine(CheckBalanceRoutine());
                 break;
             case GameState.GameOver:
-                Debug.Log("OYUN BÝTTÝ! Kaybeden: Oyuncu " + currentPlayer);
+                Debug.Log("GAME OVER! Loser: Player " + currentPlayer);
                 break;
         }
     }
@@ -63,7 +85,7 @@ public class GameManager : MonoBehaviour
     {
         if (blockPrefabs.Length > 0 && spawnPoint != null)
         {
-            int randomIndex = Random.Range(0, blockPrefabs.Length);
+            int randomIndex = UnityEngine.Random.Range(0, blockPrefabs.Length);
             Instantiate(blockPrefabs[randomIndex], spawnPoint.position, Quaternion.identity);
         }
     }
@@ -79,5 +101,20 @@ public class GameManager : MonoBehaviour
             if (currentPlayer == 1) ChangeState(GameState.WaitingForP2);
             else ChangeState(GameState.WaitingForP1);
         }
+    }
+
+    // Yeniden Baþla butonu bu fonksiyonu tetikleyecek
+    public void RestartGame()
+    {
+        // Unity'ye diyoruz ki: "Þu an açýk olan sahneyi bul ve onu baþtan yükle!"
+        // Bu, tüm deðiþkenleri, kuleyi ve her þeyi kusursuzca sýfýrlar.
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    // Ana Menüye Dön butonu bu fonksiyonu tetikleyecek
+    public void LoadMainMenu()
+    {
+        // Ýleride adýný "MainMenu" yapacaðýmýz sahneyi yükleyecek
+        SceneManager.LoadScene("MainMenu");
     }
 }
