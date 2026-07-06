@@ -2,91 +2,54 @@ using UnityEngine;
 
 public class DynamicCamera : MonoBehaviour
 {
-    //[Header("Kamera Sabitleri (Dokunma)")]
-    //private float startOrthoSize;
-    //private float startY;
-    //private Camera cam;
-    //private float highestY;
+    [Header("Kamera Kaydýrma Ayarlarý")]
+    [Tooltip("Kule, kameranýn merkezinden ne kadar yukarý çýkarsa kamera hareket etsin?")]
+    public float yThreshold = 2.5f;
 
-    //[Header("Geri Çekilme (Zoom Out) Ayarlarý")]
-    //[Tooltip("Kule bu yüksekliðe gelene kadar kamera KESÝNLÝKLE KIPIRDAMAZ")]
-    //public float zoomTetiklenmeYuksekligi = 5f;
+    [Tooltip("Sýnýr geçildiðinde kamera tek seferde ne kadar yukarý kaysýn?")]
+    public float moveUpAmount = 3.0f;
 
-    //[Tooltip("Kule sýnýrý geçtikten sonra kameranýn ne kadar hýzlý küçüleceði")]
-    //public float zoomCarpani = 0.6f;
-    //public float smoothSpeed = 3f;
+    [Tooltip("Kameranýn yukarý kayma yumuþaklýðý (Düþük = daha yavaþ/smooth)")]
+    public float smoothSpeed = 4f;
 
-    //[Header("Zemin ve Spawn Noktasý")]
-    //public Transform balanceBase;
-    //public Transform spawnPoint;
+    private float targetY; // Kameranýn gitmek istediði yeni Y koordinatý
 
-    //void Start()
-    //{
-    //    cam = GetComponent<Camera>();
+    void Start()
+    {
+        // Oyun baþladýðýnda kameranýn ilk yüksekliðini hedef olarak belirliyoruz
+        targetY = transform.position.y;
+    }
 
-    //    // Sen Unity'de kamerayý nasýl ayarladýysan, o ayarlarý baþlangýç kabul ediyoruz
-    //    startOrthoSize = cam.orthographicSize;
-    //    startY = transform.position.y;
+    void Update()
+    {
+        float highestBlockY = GetHighestBlockY();
 
-    //    if (balanceBase != null) highestY = balanceBase.position.y;
-    //}
+        // Eðer en yüksek bloðun Y koordinatý, kameranýn tetiklenme sýnýrýný geçtiyse
+        if (highestBlockY > targetY + yThreshold)
+        {
+            // Kameranýn yeni hedefini moveUpAmount kadar yukarý taþý!
+            targetY += moveUpAmount;
+        }
 
-    //void Update()
-    //{
-    //    if (balanceBase == null) return;
+        // Kamerayý her frame'de yavaþça yeni hedefine doðru kaydýr (Lerp ile pürüzsüzleþtirme)
+        Vector3 targetPosition = new Vector3(transform.position.x, targetY, transform.position.z);
+        transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * smoothSpeed);
+    }
 
-    //    GameObject[] blocks = GameObject.FindGameObjectsWithTag("Block");
-    //    float currentHighestY = balanceBase.position.y;
+    // Sahnedeki (Block etiketine sahip) en yüksek bloðu bulan yardýmcý fonksiyon
+    float GetHighestBlockY()
+    {
+        GameObject[] blocks = GameObject.FindGameObjectsWithTag("Block");
+        float maxY = -100f; // Referans için en dip nokta
 
-    //    foreach (GameObject block in blocks)
-    //    {
-    //        if (block.transform.position.y > currentHighestY)
-    //        {
-    //            currentHighestY = block.transform.position.y;
-    //        }
-    //    }
-
-    //    // Hatalý sýçramalarý filtrele
-    //    if (currentHighestY > highestY && currentHighestY < highestY + 5f)
-    //    {
-    //        highestY = currentHighestY;
-    //    }
-
-    //    // Kule baþlangýç noktasýndan (zemin) ne kadar yükseldi?
-    //    float kuleYuksekligi = highestY - balanceBase.position.y;
-
-    //    // Baþlangýçta hedeflerimiz senin Unity'de ayarladýðýn sabit ilk deðerler
-    //    float targetOrthoSize = startOrthoSize;
-    //    float targetY = startY;
-
-    //    // EÐER KULE BELÝRLENEN SINIRI GEÇERSE (ÝLK KISIM DOLARSA)
-    //    if (kuleYuksekligi > zoomTetiklenmeYuksekligi)
-    //    {
-    //        // Sýnýrý ne kadar aþtýysa, kamerayý o oranda geriye çek ve biraz yukarý kaydýr
-    //        float asimMiktari = kuleYuksekligi - zoomTetiklenmeYuksekligi;
-    //        targetOrthoSize = startOrthoSize + (asimMiktari * zoomCarpani);
-    //        targetY = startY + (asimMiktari * (zoomCarpani * 0.8f));
-    //    }
-
-    //    // HESAPLANAN DEÐERLERE YUMUÞAKÇA GEÇÝÞ YAP
-    //    cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetOrthoSize, smoothSpeed * Time.deltaTime);
-    //    Vector3 targetPos = new Vector3(transform.position.x, targetY, transform.position.z);
-    //    transform.position = Vector3.Lerp(transform.position, targetPos, smoothSpeed * Time.deltaTime);
-
-    //    // YENÝ DOÐACAK BLOK (SPAWN POINT) HER ZAMAN KAMERANIN ÝÇÝNDE KALSIN
-    //    if (spawnPoint != null)
-    //    {
-    //        // Kameranýn o anki en üst kenarýný buluyoruz
-    //        float camTopEdge = transform.position.y + cam.orthographicSize;
-
-    //        // Spawn noktasýný üst kenarýn azýcýk (1 birim) altýna koyuyoruz ki hep gözüksün
-    //        float targetSpawnY = camTopEdge - 1f;
-
-    //        // Eðer blok kuleye çok yakýnsa diye güvenlik mesafesi ekliyoruz
-    //        targetSpawnY = Mathf.Max(targetSpawnY, highestY + 3f);
-
-    //        Vector3 targetSpawnPos = new Vector3(spawnPoint.position.x, targetSpawnY, spawnPoint.position.z);
-    //        spawnPoint.position = Vector3.Lerp(spawnPoint.position, targetSpawnPos, smoothSpeed * Time.deltaTime);
-    //    }
-    //}
+        foreach (GameObject block in blocks)
+        {
+            // Eðer incelediðimiz blok þu anki en yüksekten daha yukarýdaysa, yeni rekor budur
+            if (block.transform.position.y > maxY)
+            {
+                maxY = block.transform.position.y;
+            }
+        }
+        return maxY;
+    }
 }

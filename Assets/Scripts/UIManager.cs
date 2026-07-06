@@ -53,30 +53,35 @@ public class UIManager : MonoBehaviour
                 turnText.gameObject.SetActive(false);
                 gameOverPanel.SetActive(true);
 
-                // GameManager'daki currentPlayer o an hamleyi yapaný (yani kuleyi yýkaný) tutar.
                 int kuleyiYikan = GameManager.Instance.currentPlayer;
-
-                // Transparan renkler hazýrlýyoruz (Kýrmýzý ve Yeþil)
                 Color redColor = new Color(1f, 0.2f, 0.2f, 0.7f);
                 Color greenColor = new Color(0.2f, 1f, 0.2f, 0.7f);
+
+                // GameOverUI bileþenlerini yazýlardan çekiyoruz
+                GameOverUI p1Juice = p1ResultText.GetComponent<GameOverUI>();
+                GameOverUI p2Juice = p2ResultText.GetComponent<GameOverUI>();
 
                 if (kuleyiYikan == 1)
                 {
                     // Oyuncu 1 kuleyi yýktý ve KAYBETTÝ
                     p1Background.color = redColor;
                     p1ResultText.text = "LOSE!";
-                    
+                    if (p1Juice != null) p1Juice.PlayLoseAnimation(); // P1 Titreyip düþecek
+
                     p2Background.color = greenColor;
-                    p2ResultText.text = "CONGRATULATIONS\nYOU WIN!";
+                    p2ResultText.text = "YOU WIN!";
+                    if (p2Juice != null) p2Juice.PlayWinAnimation(); // P2 Yaylanarak büyüyecek
                 }
                 else
                 {
                     // Oyuncu 2 kuleyi yýktý ve KAYBETTÝ
                     p2Background.color = redColor;
                     p2ResultText.text = "LOSE!";
-                    
+                    if (p2Juice != null) p2Juice.PlayLoseAnimation();
+
                     p1Background.color = greenColor;
-                    p1ResultText.text = "CONGRATULATIONS\nYOU WIN!";
+                    p1ResultText.text = "YOU WIN!";
+                    if (p1Juice != null) p1Juice.PlayWinAnimation();
                 }
                 break;
         }
