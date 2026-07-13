@@ -1,7 +1,7 @@
 using UnityEngine;
-using System.Collections; // Coroutine (bekleme süresi) kullanabilmek için bunu ekledik
-using System; // ACTION kullanabilmek için ekledik
-using UnityEngine.SceneManagement; // Sahne geçiþleri ve yeniden baþlatma için zorunlu!
+using System.Collections;
+using System;
+using UnityEngine.SceneManagement;
 
 public enum GameState
 {
@@ -17,11 +17,15 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
     public GameState currentState;
 
-    [Header("Blok ve Spawn Ayarlarý")]
-    public GameObject[] blockPrefabs; // Oluþturduðun Tetris prefab'larýný buraya atacaksýn
-    public Transform spawnPoint;      // Bloklarýn tepede belireceði nokta
+    [Header("Blok ve Spawn AyarlarÄ±")]
+    public GameObject[] blockPrefabs;
+    public Transform spawnPoint;
 
-    public int currentPlayer = 1;    // Sýranýn kimde olduðunu tutar (1 veya 2)
+    public int currentPlayer = 1;
+
+    // OBSERVER PATTERN Sinyalleri
+    public static event Action<GameState> OnGameStateChanged;
+    public static event Action OnScreenShake;
 
     private void Awake()
     {
@@ -34,30 +38,22 @@ public class GameManager : MonoBehaviour
         OnGameStateChanged = null;
     }
 
-    // OBSERVER PATTERN: Oyun durumunun deðiþtiðini diðer sistemlere bildirmek için evrensel sinyal
-    public static event Action<GameState> OnGameStateChanged;
-
-    // OBSERVER PATTERN: Diðer sistemlerin dinleyebileceði evrensel sinyal
-    public static event Action OnScreenShake;
-
-    // Herhangi bir obje bu fonksiyonu çaðýrarak sinyali ateþleyebilir
     public static void TriggerShake()
     {
-        OnScreenShake?.Invoke(); // Eðer bu sinyali dinleyen biri varsa, çalýþtýr!
+        OnScreenShake?.Invoke();
     }
 
     private void Start()
     {
-        // Oyunu P1'in sýrasýyla baþlatýyoruz
+        // Oyunu P1'in sÄ±rasÄ±yla baÅŸlatÄ±yoruz
         ChangeState(GameState.WaitingForP1);
     }
 
     public void ChangeState(GameState newState)
     {
         currentState = newState;
-        Debug.Log("Oyun Durumu: " + currentState);
 
-        // Oyun durumunun deðiþtiðini diðer sistemlere bildirmek için sinyali ateþle
+        // UI ve diÄŸer sistemlere durumun deÄŸiÅŸtiÄŸini haber ver
         OnGameStateChanged?.Invoke(currentState);
 
         switch (currentState)
@@ -66,55 +62,92 @@ public class GameManager : MonoBehaviour
                 currentPlayer = 1;
                 SpawnBlock();
                 break;
+
             case GameState.WaitingForP2:
                 currentPlayer = 2;
                 SpawnBlock();
                 break;
+
             case GameState.CheckingBalance:
-                // Blok býrakýldý, sallantýnýn durmasý için 2 saniye beklemeye baþlýyoruz
-                StartCoroutine(CheckBalanceRoutine());
+                // AkÄ±llÄ± Fizik Hakemi devreye girer
+                StartCoroutine(SmartPhysicsCheckRoutine());
                 break;
+
             case GameState.GameOver:
                 Debug.Log("GAME OVER! Loser: Player " + currentPlayer);
                 break;
         }
     }
 
-    // Rastgele bir blok seçip havada belirlemesini saðlayan fonksiyon
+    // AKILLI FÄ°ZÄ°K KONTROLÃœ (Denge DedektÃ¶rÃ¼)
+    private IEnumerator SmartPhysicsCheckRoutine()
+    {
+        // BloÄŸun dÃ¼ÅŸÃ¼p fiziÄŸin baÅŸlamasÄ± iÃ§in ufak avans
+        yield return new WaitForSeconds(0.5f);
+
+        bool isStable = false;
+
+        // Kule tamamen durana kadar dÃ¶ngÃ¼ Ã§alÄ±ÅŸÄ±r
+        while (!isStable)
+        {
+            // Kule yÄ±kÄ±ldÄ±ysa sistemi anÄ±nda durdur (CezayÄ± o anki oyuncuya kes)
+            if (currentState == GameState.GameOver)
+            {
+                yield break;
+            }
+
+            isStable = true;
+
+            // TÃ¼m bloklarÄ±n hareketini (velocity) kontrol et
+            GameObject[] blocks = GameObject.FindGameObjectsWithTag("Block");
+            foreach (GameObject block in blocks)
+            {
+                Rigidbody2D rb = block.GetComponent<Rigidbody2D>();
+
+                // HÄ±z 0.05'ten bÃ¼yÃ¼kse blok hala hareket ediyor demektir
+                if (rb != null && rb.linearVelocity.magnitude > 0.05f)
+                {
+                    isStable = false;
+                    break;
+                }
+            }
+
+            yield return new WaitForSeconds(0.1f);
+        }
+
+        // Kule yÄ±kÄ±lmadÄ± ve tamamen durduysa sÄ±rayÄ± diÄŸer oyuncuya geÃ§ir
+        if (currentPlayer == 1)
+        {
+            ChangeState(GameState.WaitingForP2);
+        }
+        else
+        {
+            ChangeState(GameState.WaitingForP1);
+        }
+    }
+
+    // KURÅžUN GEÃ‡Ä°RMEZ SPAWN (DoÄŸma) MANTIÄžI
     void SpawnBlock()
     {
         if (blockPrefabs.Length > 0 && spawnPoint != null)
         {
             int randomIndex = UnityEngine.Random.Range(0, blockPrefabs.Length);
-            Instantiate(blockPrefabs[randomIndex], spawnPoint.position, Quaternion.identity);
+
+            // KameranÄ±n gÃ¼ncel yÃ¼ksekliÄŸini alÄ±p bloÄŸu her zaman gÃ¼venli mesafede (4.5f) doÄŸur
+            float kameraY = Camera.main.transform.position.y;
+            Vector3 dinamikSpawnPozisyonu = new Vector3(spawnPoint.position.x, kameraY + 4.5f, spawnPoint.position.z);
+
+            Instantiate(blockPrefabs[randomIndex], dinamikSpawnPozisyonu, Quaternion.identity);
         }
     }
 
-    // 2 saniyelik zamanlayýcý (Oyunun hata vermeden beklemesini saðlayan sihirli yapý)
-    IEnumerator CheckBalanceRoutine()
-    {
-        yield return new WaitForSeconds(2.5f); // 2.5 saniye kulenin sallantýsýný izle
-
-        // Eðer bu 2.5 saniye içinde blok yere düþüp "GameOver" olmadýysa, sýrayý deðiþtir!
-        if (currentState != GameState.GameOver)
-        {
-            if (currentPlayer == 1) ChangeState(GameState.WaitingForP2);
-            else ChangeState(GameState.WaitingForP1);
-        }
-    }
-
-    // Yeniden Baþla butonu bu fonksiyonu tetikleyecek
     public void RestartGame()
     {
-        // Unity'ye diyoruz ki: "Þu an açýk olan sahneyi bul ve onu baþtan yükle!"
-        // Bu, tüm deðiþkenleri, kuleyi ve her þeyi kusursuzca sýfýrlar.
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
-    // Ana Menüye Dön butonu bu fonksiyonu tetikleyecek
     public void LoadMainMenu()
     {
-        // Ýleride adýný "MainMenu" yapacaðýmýz sahneyi yükleyecek
         SceneManager.LoadScene("MainMenu");
     }
 }
